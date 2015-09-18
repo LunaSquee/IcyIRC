@@ -1,0 +1,48 @@
+doctype html
+html
+	head
+		meta(charset='utf-8')
+		title #{config.general.name}
+		link(rel='stylesheet', type='text/css', href='/build/style/main.css')
+		link(rel='stylesheet', type='text/css', href='https://fonts.googleapis.com/css?family=Open+Sans')
+
+	body
+		#startView
+			#centerbox
+				#cbinner
+					h1#mainTitle #{config.general.name}
+					form#mainForm
+						label(for='irNickname') Nickname
+						input#irNickname(type='text')
+						br
+						label(for='irChannel') Channels
+						input#irChannel(type='text',placeholder="#channel")
+						br
+						button#irInit Connect
+						br
+						span#showMore Set Server and Port
+						br
+						div#server-and-port-options
+							label(for='irServer') Server
+							input#irServer(type='text',placeholder="irc.server.net")
+							br
+							label(for='irPort') Port
+							input#irPort(type='text',value="6667")
+							br
+							label(for='irSSL') Use SSL
+							input#irSSL(type='checkbox')
+		#chatView(style="display:none")
+			#tabsArea
+				#tabList
+			#chatArea
+				#topicView
+				#messageView
+				#userList
+
+			#inputArea
+				span#ircNickname icydiamond
+				#wrap
+					input#ircMessage(type="text")
+
+	script(type="text/javascript", src='/socket.io/socket.io.js')
+	script(type='text/javascript', src='/build/script/main.js')
