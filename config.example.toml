@@ -1,0 +1,14 @@
+# Main IcyIRC config
+
+[general]
+name = 'IcyIRC'
+
+[irc]
+default_quit_msg = 'IcyIRC WebIRC Client (v0.0.1-SNAPSHOT)'
+default_kick_msg = ''
+default_chan     = '#parasprite'
+default_serv     = ''
+
+[server]
+host = 'localhost'
+port = 8002
