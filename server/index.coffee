@@ -50,7 +50,15 @@ server.on 'error', (err) ->
 
 sockets = io.listen(server)
 sockets.on 'connection', (client) ->
+    ircdata = {}
     console.log 'client connected'
     client.on 'initirc', (props) ->
-        console.log 'client broadcast '+props
-        client.emit 'ircconnect'
+        console.log 'client initiated'
+        ircdata = props
+        client.emit 'ircconnect', props
+    client.on 'rawinput', (input) ->
+        if input == 'testjoin'
+            client.emit 'join', {channel:'#ponies', nick:ircdata.nick, server:ircdata.server}
+            client.emit 'names', {channel:'#ponies', nicks:{'best_pony':'~', 'fluttershy':'@', 'rainbowdash':'@', 'pinkiepie':'~', 'applejack':'+','derpy':'+','somepony':''}}
+        console.log 'client broadcast '+input
+        client.emit 'echoback', input

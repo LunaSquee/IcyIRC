@@ -60,8 +60,7 @@ module.exports = {
 			$: 'jquery',
 			Backbone: 'backbone',
 			_: 'underscore',
-			Marionette: 'backbone.marionette',
-			Mustache: 'mustache'
+			Marionette: 'backbone.marionette'
 		})
 	],
 
