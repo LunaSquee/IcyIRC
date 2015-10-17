@@ -204,8 +204,9 @@ class NickListView extends Backbone.View
         nicksSorted.forEach (e) ->
             opstat = if self.opNickRegex.test(e) then e.substring(0, 1) else ""
             nickn = if self.opNickRegex.test(e) then e.substring(1) else e
-            opstatsz = if opstat == '' then "" else '<span class="opstat" title="'+self.getPrefixName(opstat)+'">'+opstat+'</span>'
-            nicks2.push('<div class="listednick" id="'+nickn+'">'+opstatsz+' <span class="nickname">'+nickn+'</span></div>')
+            prefixname = self.getPrefixName opstat
+            opstatsz = if opstat == '' then "" else '<span class="opstat op_'+prefixname.toLowerCase()+'" title="'+prefixname+'">'+opstat+'</span>'
+            nicks2.push '<div class="listednick" id="u_'+nickn+'"><span class="nickname" data-nickname="'+nickn+'">'+opstatsz+''+nickn+'</span></div>'
 
         $(this.el).html(nicks2.join('\n'))
         ops = this.WhoisOp(nicksSorted)
@@ -351,9 +352,12 @@ class AppView extends Backbone.View
 
     events:
         'keypress #ircMessage': 'sendInput'
+        'click #ircNicknameChange': 'changeNick'
 
-    updateNick: ->
-        $('#ircNickname').text(irc.me.get('nick'))
+    updateNick: (nick) ->
+        console.log nick
+        $('#ircNickname').text nick
+        $('#ircNN').val nick
 
     addTab: (frame) ->
         tab = new FrameTabView({model: frame})
@@ -373,9 +377,21 @@ class AppView extends Backbone.View
 
         this.input.val('')
 
+    changeNick: (e) ->
+        e && e.preventDefault()
+        nickn = $('#ircNN').val()
+        if nickn == null
+            return
+        irc.me.set({nick: nickn})
+        $('#nicknamebox').addClass 'invisible'
+        this.updateNick(nickn)
+
     render: ->
         $('#chatView').show()
-        this.updateNick()
+        $('#ircNickname').click (e) ->
+            $('#nicknamebox').toggleClass 'invisible'
+            $('#ircNN').val irc.me.get 'nick'
+        this.updateNick(irc.me.get 'nick')
 
 
 class ConnectView extends Backbone.View
@@ -457,6 +473,9 @@ socket.on 'join', (data) ->
         joinMessage = new Message({type: 'join', nick: data.nick})
         joinMessage.setText()
         channel.stream.add(joinMessage)
+
+socket.on 'nick', (data) ->
+
 
 socket.on 'part', (data) ->
     if data.nick == irc.me.get('nick')

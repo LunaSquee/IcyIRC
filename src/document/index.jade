@@ -24,7 +24,7 @@ html
 						br
 						div#server-and-port-options
 							label(for='irServer') Server
-							input#irServer(type='text',placeholder="irc.server.net")
+							input#irServer(value='#{config.irc.default_serv}',type='text',placeholder="irc.server.net")
 							br
 							label(for='irPort') Port
 							input#irPort(type='text',value="6667")
@@ -35,10 +35,14 @@ html
 			#tabsArea
 				#tabList
 			#chatArea
+				.nickdivider
 				#topicView
 				#messageView
 				#userList
-
+			#nicknamebox.invisible
+				form#nickChanger
+					input#ircNN(type="text")
+					button#ircNicknameChange Done
 			#inputArea
 				span#ircNickname icydiamond
 				#wrap

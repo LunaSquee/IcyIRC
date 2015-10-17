@@ -8,6 +8,7 @@ paxjson = require __dirname + '/../package.json'
 config = require __dirname + '/../script/config'
 
 io = require 'socket.io'
+# irc = require './irc'
 
 args = commander
     .command 'icyirc'
@@ -59,6 +60,6 @@ sockets.on 'connection', (client) ->
     client.on 'rawinput', (input) ->
         if input == 'testjoin'
             client.emit 'join', {channel:'#ponies', nick:ircdata.nick, server:ircdata.server}
-            client.emit 'names', {channel:'#ponies', nicks:{'best_pony':'~', 'fluttershy':'@', 'rainbowdash':'@', 'pinkiepie':'~', 'applejack':'+','derpy':'+','somepony':''}}
+            client.emit 'names', {channel:'#ponies', nicks:{'best_pony':'~', 'fluttershy':'@', 'rainbowdash':'@', 'squeely':'%', 'pinkiepie':'~', 'applejack':'+','derpy':'+','somepony':''}}
         console.log 'client broadcast '+input
         client.emit 'echoback', input

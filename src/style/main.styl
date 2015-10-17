@@ -134,6 +134,31 @@ input,textarea
     bottom: 0
     left: 0
     right: 0
+    #nicknamebox
+        position: absolute
+        bottom: 55px
+        left: 10px
+        background-color: #d8d8d8
+        padding: 10px
+        border-radius: 10px
+        &:after
+            content: ""
+            width: 0
+            height: 0
+            border-left: 20px solid transparent
+            border-right: 20px solid transparent
+            border-top: 20px solid #d8d8d8
+            position: absolute
+            top: 50px
+        &:before
+            content: "Change your nickname"
+            position: absolute
+            top: -10px
+            background-color: #d8d8d8
+            border-radius: 10px
+            padding: 0 10px
+        &.invisible
+            display: none
     #tabsArea
         position: absolute
         top: 0
@@ -165,13 +190,25 @@ input,textarea
         left: 0
         right: 0
         background-color: #F1F1F1
+        .message
+            clear: both
+            word-wrap: break-word
+        .nickdivider
+            position: absolute
+            left: 110px
+            border-left: 1px solid #dadada
+            bottom: 0
+            top: 0
         #topicView
             top: 0
             left: 0
             right: 0
             height: 20px
-            background-color: #FBFBFB
             display: none
+            position: absolute
+            border-bottom: 1px solid #dadada
+            font-size: 15px
+            text-align: center
         #messageView
             position: absolute
             bottom: 0
@@ -184,23 +221,40 @@ input,textarea
             top: 0
             right: 0
             bottom: 0
-            width: 270px
-            border-left: 1px solid #DADADA
+            width: 250px
+            border-left: 1px solid #dadada
+            padding: 10px
             display: none
             .opstat
-                width: 20px;
-                height: 20px;
-                display: inline-block;
-                text-align: center;
-                background-color: #E0E0E0;
-                border-radius: 10px;
-                margin: 1px;
-                line-height: 19px;
-                color: #0BAB00;
+                width: 20px
+                height: 20px
+                display: inline-block
+                text-align: center
+                background-color: #E0E0E0
+                border-radius: 10px
+                margin: 1px
+                line-height: 19px
+                color: #0BAB00
                 cursor: help
+                margin-right: 5px
+                font-size: 21px
+                &.op_owner
+                    color: #C50000 !important
+                &.op_voice
+                    color: #0089FF !important
+                &.op_half-op
+                    font-size: 20px !important
+                    color: #B119A5 !important
             .nickname
-                font-size: 18px;
+                font-size: 18px
                 cursor: pointer
+                width: 250px
+                display: inline-block
+                overflow: hidden
+                transition color linear 0.1s, margin-left linear 0.1s
+                &:hover
+                    margin-left: 2px
+                    color: #7D7D7D
         &.displaynicklist
             #topicView
                 right: 270px
@@ -210,7 +264,7 @@ input,textarea
                 display: block
         &.displaytopic
             #messageView
-                top: 60px
+                top: 20px
             #topicView
                 display: block
 
@@ -241,6 +295,7 @@ input,textarea
             border-bottom-left-radius: 5px
             padding: 5px
             color: #fff
+            cursor: pointer
 
 #messageView .error
     background-color: rgba(255, 0, 0, 0.41)
