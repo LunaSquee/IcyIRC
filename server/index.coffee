@@ -62,13 +62,19 @@ sockets.on 'connection', (client) ->
                 console.log 'client initiated'
                 ircdata = data.props
                 console.log data.props
-                client.emit 'ircconnect', data.props
+                run = () ->
+                    client.emit 'ircconnect', data.props
+                setTimeout(run, 1000)
             when "rawinput"
                 if data.message == 'testjoin'
                     client.emit 'join', {channel:'#ponies', nick:ircdata.nick, server:ircdata.server}
                     nicks = {channel:'#ponies', nicks:{'best_pony':'~', 'fluttershy':'@', 'rainbowdash':'@', 'squeely':'%', 'pinkiepie':'~', 'applejack':'+','derpy':'+','somepony':''}}
                     nicks.nicks[ircdata.nick] = '~'
                     client.emit 'names', nicks
+                    client.emit 'topic', {channel:'#ponies', topic: "This is the channel for all the nice ponies! All the ponies, all the time. IcyIRC is best irc client. IcyEmerald is OTP. http://localhost:8002/toasters.com:233/?nick=BestPony#parasprite,#wow", nick:"IcyDiamond"}
+                    setTimeout () ->
+                        client.emit 'quit', {nick: "squeely", reason:"Quit: Bye bye!"}
+                    , 10000
                 if data.message == 'testjoin-more'
                     client.emit 'join', {channel:'#horsie', nick:ircdata.nick, server:ircdata.server}
                     client.emit 'names', {channel:'#horsie', nicks:{'icydiamond':'~', 'squeely':'%', 'pinkiepie':'~', 'applejack':'+','derpy':'+','randomz':''}}

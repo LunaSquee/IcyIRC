@@ -5,12 +5,14 @@ html
 		title #{config.general.name}
 		link(rel='stylesheet', type='text/css', href='/build/style/main.css')
 		link(rel='stylesheet', type='text/css', href='https://fonts.googleapis.com/css?family=Open+Sans')
+		link(rel="stylesheet", type='text/css', href='https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css')
 
 	body
 		#startView
 			#centerbox
 				#cbinner
 					h1#mainTitle #{config.general.name}
+					span#feedback
 					form#mainForm
 						label(for='irNickname') Nickname
 						input#irNickname(type='text')
@@ -34,6 +36,13 @@ html
 		#chatView(style="display:none")
 			#tabsArea
 				#tabList
+				.optionmotifs
+					span#usercount
+						i(title="Information")#chninfo.fa.fa-fw.fa-info-circle
+						i(title="Nicks in channel (operators)")#user.fa.fa-users &nbsp;
+						span#usercounti 12
+						span#usercounto (2)
+					i#settings-menu.fa.fa-fw.fa-gear.fa-2x
 			#chatArea
 				.nickdivider
 				#topicView

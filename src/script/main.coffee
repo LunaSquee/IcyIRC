@@ -38,6 +38,17 @@ if !String.prototype.contains
         else
             return false
 
+if !String.prototype.linkify
+    String.prototype.linkify = () ->
+        text = this || ""
+        re = /\b((?:https?:\/\/|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}\/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{}:'".,<>?«»“”‘’]))/gi
+        parsed = text.replace re, (url) ->
+            href = url
+            if url.indexOf('http') != 0
+                href = 'http://' + url
+            return '<a href="' + href + '" target="_blank">' + url + '</a>'
+        return parsed
+
 class Message extends Backbone.Model
         defaults:
             # expected properties:
@@ -60,8 +71,8 @@ class Message extends Backbone.Model
         setText: ->
             text = ''
             switch (this.get('type'))
-                when 'join' then text = this.get('nick') + ' has joined the channel'
-                when 'part' then text = this.get('nick') + ' has left the channel ('+this.get("text")+')'
+                when 'join' then text = this.get('nick') + ' has joined '+this.get('channel')
+                when 'part' then text = this.get('nick') + ' has left '+this.get('channel')+' ('+this.get("text")+')'
                 when 'quit' then text = this.get('nick') + ' has quit ('+this.get("text")+')'
                 when 'action' then text = '* '+ this.get('nick') + ' '+this.get("text")
                 when 'nick' then text = this.get('oldNick') + ' is now known as ' + this.get('newNick')
@@ -135,23 +146,12 @@ class MessageView extends Backbone.View
     initialize: ->
         this.render()
 
-    linkify: (text) ->
-        # see http://daringfireball.net/2010/07/improved_regex_for_matching_urls
-        re = /\b((?:https?:\/\/|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}\/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{}:'".,<>?«»“”‘’]))/gi
-        parsed = text.replace re, (url) ->
-            # turn into a link
-            href = url
-            if url.indexOf('http') != 0
-                href = 'http://' + url
-            return '<a href="' + href + '" target="_blank">' + url + '</a>'
-        return parsed
-
     render: =>
         context =
             sender: this.model.get('sender')
             text: this.model.get('text')
 
-        $(@el).addClass(@model.get('type')).html(this.linkify(this.tmpl(context)))
+        $(@el).addClass(@model.get('type')).html this.tmpl(context).linkify()
         
         if context.sender && context.sender.toLowerCase() != irc.me.get("nick").toLowerCase()
             if context.text && context.text.indexOf(irc.me.get("nick")) != -1
@@ -248,6 +248,8 @@ class NickListView extends Backbone.View
             $(self.el).append self.tmpl context
 
         ops = this.WhoisOp(nicksSorted)
+        $('#usercounti').text nicksSorted.length
+        $('#usercounto').text '('+ops.length+')'
 
     changeNick: ->
         if this.bound
@@ -261,7 +263,7 @@ class FrameView extends Backbone.View
     position: {}
 
     initialize: ->
-        console.log 'tab init'
+        # idk
 
     addMessage: (message, single) ->
         # Only do this on single message additions
@@ -269,27 +271,27 @@ class FrameView extends Backbone.View
             position = $(this.el).scrollTop()
             atBottom = $(this.el)[0].scrollHeight - position == $(this.el).innerHeight()
 
-        view = new MessageView({model: message})
+        view = new MessageView {model: message}
         $(this.el).append(view.el)
         # Scroll to bottom on new message if already at bottom
         if atBottom
-           $(this.el).scrollTop(position + 100)
+           $(this.el).scrollTop position + 100
 
     updateTopic: (channel) ->
-        $('#topicView').text(channel.get('topic'))
-        $('#chatArea').addClass("displaytopic")
+        $('#topicView').html channel.get('topic').linkify()
+        $('#chatArea').addClass "displaytopic"
 
     # Switch focus to a different frame
     focus: (frame) =>
         # Save scroll position for frame before switching
-        if this.focused
-            this.position[this.focused.get('name')] = $(this.el).scrollTop()
+        if @focused
+            this.position[@focused.get('name')] = $(@el).scrollTop()
 
         self = this
-        this.focused = frame
-        frames.setActive(this.focused)
+        @focused = frame
+        frames.setActive(@focused)
 
-        $(this.el).empty()
+        $(@el).empty()
 
         frame.stream.each (message) ->
             self.addMessage(message, false)
@@ -297,28 +299,27 @@ class FrameView extends Backbone.View
         nickList.addAll(frame.participants)
 
         if frame.get('type') == 'channel'
-            $('#chatArea').addClass("displaynicklist")
-            if frame.get('topic') then this.updateTopic(frame)
+            $('#chatArea').addClass "displaynicklist"
+            if frame.get 'topic' then this.updateTopic frame
+            $('#usercount').show()
         else
-            $('#chatArea').removeClass("displaynicklist")
-            $('#chatArea').removeClass("displaytopic")
-        $(this.el).removeClass().addClass(frame.get('type'))
-        position = this.position[frame.get('name')]
+            $('#chatArea').removeClass "displaynicklist"
+            $('#chatArea').removeClass "displaytopic"
+            $('#usercount').hide()
+        $(@el).removeClass().addClass frame.get 'type'
+        position = this.position[frame.get 'name']
         
-        $('#messageView').scrollTop((position ? position : 0))
+        $('#messageView').scrollTop(if position then position else 0)
         
         # Only the selected frame should send messages
         frames.each (frm) ->
-            frm.stream.unbind('add')
+            frm.stream.unbind 'add'
             frm.participants.unbind()
             frm.unbind()
 
         frame.bind('change:topic', this.updateTopic, this)
         frame.stream.bind('add', this.addMessage, this)
-        nickList.switchChannel(frame)
-
-    updateNicks: (model, nicks) ->
-        console.log('Nicks rendered')
+        nickList.switchChannel frame
 
 class FrameTabView extends Backbone.View
     tagName: 'div',
@@ -384,19 +385,17 @@ class AppView extends Backbone.View
     initialize: ->
         frames.bind('add', this.addTab, this)
         this.input = this.$('#ircMessage')
-        this.render()
 
     events:
         'keypress #ircMessage': 'sendInput'
         'click #ircNicknameChange': 'changeNick'
 
     updateNick: (nick) ->
-        console.log nick
         $('#ircNickname').text nick
         $('#ircNN').val nick
 
     addTab: (frame) ->
-        tab = new FrameTabView({model: frame})
+        tab = new FrameTabView {model: frame}
         this.frameList.append(tab.el)
         tab.setActive()
 
@@ -427,7 +426,11 @@ class AppView extends Backbone.View
         $('#ircNickname').click (e) ->
             $('#nicknamebox').toggleClass 'invisible'
             $('#ircNN').val irc.me.get 'nick'
+
         this.updateNick(irc.me.get 'nick')
+
+        $('#startView').hide()
+        $(this.el).show()
 
 class ConnectView extends Backbone.View
     el: $('#startView')
@@ -499,7 +502,6 @@ class ConnectView extends Backbone.View
         if(irc.alreadyConnected)
             return
 
-        irc.alreadyConnected = true
         channelInput = $('#irChannel').val().trim()
         channels = if channelInput then channelInput.split(',') else []
         channels.forEach (obj, index) ->
@@ -510,15 +512,15 @@ class ConnectView extends Backbone.View
             nick: $('#irNickname').val()
             server: $('#irServer').val()
             port: $('#irPort').val() || 6667
-            secure: $('#irSSL').is(':checked')
+            secure: $('#irSSL').is ':checked'
             channels: channels
 
         if connectInfo.server == ''
-            alert("Server is required.")
+            $('#feedback').text "Server is required."
             return
 
         if connectInfo.nick == ''
-            alert("Nickname is required.")
+            $('#feedback').text "Nickname is required."
             return
 
         #socket.emit 'initirc', connectInfo
@@ -526,7 +528,8 @@ class ConnectView extends Backbone.View
 
         irc.me = new Person {nick: connectInfo.nick}
         
-        alert("Connecting..")
+        $('#feedback').text "Connecting.."
+        irc.alreadyConnected = true
             
         irc.frameWindow = new FrameView
         irc.app = new AppView
@@ -539,7 +542,13 @@ clientToServerSend = (main) ->
     socket.emit 'clientevent', main
 
 socket.on 'ircconnect', (stuff) ->
-    $('#startView').hide()
+    if stuff.error
+        frames.getByName(stuff.server).stream.add {sender: '*', raw: stuff.error, type: 'error'}
+        $('#feedback').text "Connection failed"
+        irc.alreadyConnected = false
+        return
+
+    irc.app.render()
     frames.getByName(stuff.server).stream.add {sender: '*', raw: "Connected to server"}
 
 socket.on 'echoback', (message) ->
@@ -549,10 +558,14 @@ socket.on 'join', (data) ->
     if data.nick == irc.me.get('nick')
         if !frames.getByName(data.channel)
             frames.add({name: data.channel, type:"channel"})
+        channel = frames.getByName(data.channel)
+        joinMessage = new Message({type: 'join', nick: data.nick, sender:'-->', channel: data.channel})
+        joinMessage.setText()
+        channel.stream.add(joinMessage)
     else
         channel = frames.getByName(data.channel)
         channel.participants.add({nick: data.nick})
-        joinMessage = new Message({type: 'join', nick: data.nick})
+        joinMessage = new Message({type: 'join', nick: data.nick, sender:'-->', channel: data.channel})
         joinMessage.setText()
         channel.stream.add(joinMessage)
 
@@ -571,8 +584,6 @@ socket.on 'nick', (data) ->
         
         channel = frames.getByName ch.get 'name'
         if channel
-            console.log channel.participants
-            console.log channel.participants.getByNick(data.oldNick)
             if channel.participants.getByNick(data.oldNick)
                 channel.participants.getByNick(data.oldNick).set {nick: data.nick}
                 nickMessage = new Message {type: 'nick', sender: ' ', oldNick: data.oldNick, newNick: data.nick}
@@ -583,7 +594,7 @@ socket.on 'part', (data) ->
     if data.nick == irc.me.get('nick')
         channel = frames.getByName(data.channel)
         if channel
-            partMessage = new Message {type: 'part', nick: data.nick, raw: data.reason}
+            partMessage = new Message {type: 'part', nick: data.nick, raw: data.reason, sender: '<--', channel: data.channel}
             partMessage.setText()
             channel.stream.add partMessage
             channel.stream.add {type: 'error', raw: "You are no longer talking in "+channel.get("name")}
@@ -591,14 +602,35 @@ socket.on 'part', (data) ->
     else
         channel = frames.getByName(data.channel)
         channel.participants.getByNick(data.nick).destroy()
-        partMessage = new Message {type: 'part', nick: data.nick, raw: data.reason}
+        partMessage = new Message {type: 'part', nick: data.nick, raw: data.reason, sender: '<--', channel: data.channel}
         partMessage.setText()
         channel.stream.add(partMessage)
         if channel.get("active") == channel
             nickList.update(channel.participants)
+
+socket.on 'quit', (data) ->
+    frames.each (ch) ->
+        if ch.get 'type' != 'channel'
+            return
+        
+        channel = frames.getByName ch.get 'name'
+        if channel
+            if channel.participants.getByNick(data.nick)
+                channel.participants.remove(channel.participants.getByNick(data.nick))
+                nickMessage = new Message {type: 'quit', sender: '<--', nick: data.nick, text: data.reason}
+                nickMessage.setText()
+                channel.stream.add nickMessage
 
 socket.on 'names', (data) ->
     frame = frames.getByName data.channel
     frame.participants.reset()
     for nick, mode of data.nicks
         frame.participants.add {nick: nick, opStatus: mode}
+
+socket.on 'topic', (data) ->
+    channel = frames.getByName data.channel
+    if channel
+        channel.set {topic: data.topic}
+        topicmsg = new Message {type: 'topic', nick: data.nick, raw: data.channel+" to "+data.topic}
+        topicmsg.setText()
+        channel.stream.add topicmsg
