@@ -2,6 +2,42 @@ socket = io()
 
 window.irc = window.irc || {}
 
+window.getURLParam = (param) ->
+    sPageURL = window.location.search.substring(1)
+    sURLVariables = sPageURL.split '&'
+    for index, sURLVariable of sURLVariables
+        sParameterName = sURLVariable.split '='
+        if sParameterName[0] == param
+            return sParameterName[1]
+
+if !String.prototype.isEmpty
+    String.prototype.isEmpty = ->
+        if this != null && this.length >= 0 && /\S/.test(this)
+            return false
+        else
+            return true
+
+if !String.prototype.hashCode
+    String.prototype.hashCode = ->
+        hash = 0
+        for index, varib of this
+           hash = this.charCodeAt(index) + ((hash << 5) - hash)
+        return hash
+
+if !String.prototype.startsWith
+    String.prototype.startsWith = (c) ->
+        if !c.isEmpty() && this.indexOf(c) == 0
+            return true
+        else
+            return false
+
+if !String.prototype.contains
+    String.prototype.contains = (c) ->
+        if !c.isEmpty() && this.indexOf(c) != -1
+            return true
+        else
+            return false
+
 class Message extends Backbone.Model
         defaults:
             # expected properties:
@@ -45,10 +81,10 @@ class Person extends Backbone.Model
 
 class Participants extends Backbone.Collection
     model: Person
+
     getByNick: (nick) ->
         return this.detect (person) ->
-            p = person.get('nick') == nick
-            if(p)
+            if person.get('nick').toLowerCase() == nick.toLowerCase()
                 return person
 
 class Frame extends Backbone.Model
@@ -124,8 +160,10 @@ class MessageView extends Backbone.View
         return this
 
 class NickListView extends Backbone.View
-    el: $('#userList')
-    bound: null
+    el: $('#userList'),
+    tmpl: require('template/nick.tmpl.mustache'),
+    bound: null,
+
     initialize: ->
         _.bindAll(this)
     
@@ -141,8 +179,7 @@ class NickListView extends Backbone.View
             this.update(this.bound.participants)
     
     update: (participants) ->
-        $(this.el).html("")
-        this.addAll(participants)
+        this.addAll participants
 
     opNickRegex: new RegExp('^[~&@%+]')
 
@@ -191,27 +228,26 @@ class NickListView extends Backbone.View
             return 0
         return names
 
-    addAll: (participants) ->
+    addAll: (participants) =>
+        $(this.el).html ""
+
         nicksSorted = []
         nicks2 = []
         self = this
 
         participants.each (p) ->
-            nicksSorted.push(p.get('opStatus') + p.get('nick'))
+            nicksSorted.push p.get('opStatus') + p.get('nick')
 
         nicksSorted = this.sortNamesArray(nicksSorted)
 
         nicksSorted.forEach (e) ->
-            opstat = if self.opNickRegex.test(e) then e.substring(0, 1) else ""
+            opstat = if self.opNickRegex.test(e) then e.substring(0, 1) else null
             nickn = if self.opNickRegex.test(e) then e.substring(1) else e
             prefixname = self.getPrefixName opstat
-            opstatsz = if opstat == '' then "" else '<span class="opstat op_'+prefixname.toLowerCase()+'" title="'+prefixname+'">'+opstat+'</span>'
-            nicks2.push '<div class="listednick" id="u_'+nickn+'"><span class="nickname" data-nickname="'+nickn+'">'+opstatsz+''+nickn+'</span></div>'
+            context = {nickname: nickn, prefixname: prefixname, grpfix: prefixname.toLowerCase(), opstat: opstat}
+            $(self.el).append self.tmpl context
 
-        $(this.el).html(nicks2.join('\n'))
         ops = this.WhoisOp(nicksSorted)
-
-        #$('#nickcount').text(nicksSorted.length+" User"+ if nicksSorted.length != 1 then "s" else "" +" ("+ops.length+" op"+if ops.length != 1 then "s" else ""+")")
 
     changeNick: ->
         if this.bound
@@ -299,11 +335,10 @@ class FrameTabView extends Backbone.View
 
     # Send PART command to server
     part: ->
-        #if this.model.get('type') == 'channel'
-            #todo: emit part to this.model.get('name')
-
         mframe = frames.getByName(this.model.get('name'))
         if mframe
+            if mframe.get("type") == "channel"
+                clientToServerSend {type: "part", channel: mframe.get("name")}
             frames.remove(mframe)
             mframe.destroy()
             this.model.destroy()
@@ -319,8 +354,8 @@ class FrameTabView extends Backbone.View
                     else
                         $(this.el).next().click()
 
-        d = frames.getByName($(this.el).data('frame'))
-        if d != null && d.get('type') != "status"
+        d = frames.getByName $(this.el).data('frame')
+        if d != null && d.get 'type' != "status"
             this.isClosing = true
             this.part()
             $(this.el).remove()
@@ -329,13 +364,14 @@ class FrameTabView extends Backbone.View
         if this.isClosing
             return
         $(this.el).addClass('active').siblings().removeClass('active')
-        irc.frameWindow.focus(this.model)
+        irc.frameWindow.focus this.model
 
     render: ->
         context =
-            name: this.model.get('name')
-            type: this.model.get('type')
+            name: this.model.get 'name'
+            type: this.model.get 'type'
         $(this.el).html(this.tmpl(context)).data('frame', context.name)
+        $(this.el).addClass context.type
         return this
 
     isStatus: ->
@@ -373,7 +409,8 @@ class AppView extends Backbone.View
         if input == null || input == ""
             return
 
-        socket.emit 'rawinput', input
+        # socket.emit 'rawinput', input
+        clientToServerSend {type: 'rawinput', message: input, target: frame.get("name")}
 
         this.input.val('')
 
@@ -382,9 +419,8 @@ class AppView extends Backbone.View
         nickn = $('#ircNN').val()
         if nickn == null
             return
-        irc.me.set({nick: nickn})
+        clientToServerSend {type: 'nick', newNick: nickn}
         $('#nicknamebox').addClass 'invisible'
-        this.updateNick(nickn)
 
     render: ->
         $('#chatView').show()
@@ -392,7 +428,6 @@ class AppView extends Backbone.View
             $('#nicknamebox').toggleClass 'invisible'
             $('#ircNN').val irc.me.get 'nick'
         this.updateNick(irc.me.get 'nick')
-
 
 class ConnectView extends Backbone.View
     el: $('#startView')
@@ -405,11 +440,54 @@ class ConnectView extends Backbone.View
         this.render()
     
     render: ->
-        #this.el.modal({backdrop: true, show: true})
         $('#irNick').focus()
         $('#showMore').click ->
             $('#server-and-port-options').toggleClass("shown")
         
+        server = window.getURLParam('server')
+        port = window.getURLParam('port')
+        nickname = window.getURLParam('nick')
+        ssl = window.getURLParam('ssl')
+        channel = window.location.hash
+
+        if location.pathname.match(/\./g) != null
+            server = location.pathname.replace(/\//g, '')
+
+        if server != undefined
+            if server.contains ':'
+                reminder = server.split ':'
+                port = reminder[1]
+                server = reminder[0]
+            if server.startsWith '+'
+                server = server.substring 1
+                ssl = 1
+            $('#irServer').val server
+
+        if nickname != undefined
+            nickname = nickname.replace('?', Math.floor(Math.random() * 1000) + 1)
+            $('#irNickname').val nickname
+
+        if port != undefined
+            if parseInt port
+                port = parseInt port
+            else
+                port = 6667
+            $('#irPort').val port
+        
+        if channel != undefined
+            if !channel.startsWith '#'
+                channel = '#' + channel
+            $('#irChannel').val channel
+
+        if ssl != undefined
+            if parseInt ssl
+                if parseInt ssl == 0
+                    $('#irSSL').prop 'checked', false
+                else
+                    $('#irSSL').prop 'checked', true
+            else
+                $('#irSSL').prop 'checked', true
+
     connectOnEnter: (e) =>
         if (e.keyCode != 13)
         	return
@@ -443,22 +521,26 @@ class ConnectView extends Backbone.View
             alert("Nickname is required.")
             return
 
-        socket.emit 'initirc', connectInfo
+        #socket.emit 'initirc', connectInfo
+        clientToServerSend {type: 'initirc', props: connectInfo}
 
-        irc.me = new Person({nick: connectInfo.nick})
+        irc.me = new Person {nick: connectInfo.nick}
         
         alert("Connecting..")
             
         irc.frameWindow = new FrameView
         irc.app = new AppView
         # Create the status "frame"
-        frames.add({name: connectInfo.server, type: 'status', server:connectInfo.server})
+        frames.add {name: connectInfo.server, type: 'status', server:connectInfo.server}
 
 connect = new ConnectView
 
+clientToServerSend = (main) ->
+    socket.emit 'clientevent', main
+
 socket.on 'ircconnect', (stuff) ->
     $('#startView').hide()
-    frames.getByName(stuff.server).stream.add({sender: '*', raw: "Connected to server"})
+    frames.getByName(stuff.server).stream.add {sender: '*', raw: "Connected to server"}
 
 socket.on 'echoback', (message) ->
     frames.getActive().stream.add({sender: irc.me.get('nick'), raw: message})
@@ -466,7 +548,7 @@ socket.on 'echoback', (message) ->
 socket.on 'join', (data) ->
     if data.nick == irc.me.get('nick')
         if !frames.getByName(data.channel)
-            frames.add({name: data.channel})
+            frames.add({name: data.channel, type:"channel"})
     else
         channel = frames.getByName(data.channel)
         channel.participants.add({nick: data.nick})
@@ -475,27 +557,48 @@ socket.on 'join', (data) ->
         channel.stream.add(joinMessage)
 
 socket.on 'nick', (data) ->
+    if data.oldNick == irc.me.get 'nick'
+        irc.me.set {nick: data.nick}
+        irc.app.updateNick data.nick
 
+    frames.each (ch) ->
+        if ch.get 'name' == data.oldNick
+            ch.set {name: data.nick}
+            return
+
+        if ch.get 'type' != 'channel'
+            return
+        
+        channel = frames.getByName ch.get 'name'
+        if channel
+            console.log channel.participants
+            console.log channel.participants.getByNick(data.oldNick)
+            if channel.participants.getByNick(data.oldNick)
+                channel.participants.getByNick(data.oldNick).set {nick: data.nick}
+                nickMessage = new Message {type: 'nick', sender: ' ', oldNick: data.oldNick, newNick: data.nick}
+                nickMessage.setText()
+                channel.stream.add nickMessage
 
 socket.on 'part', (data) ->
     if data.nick == irc.me.get('nick')
         channel = frames.getByName(data.channel)
         if channel
-            partMessage = new Message({type: 'part', nick: data.nick, raw: data.reason})
+            partMessage = new Message {type: 'part', nick: data.nick, raw: data.reason}
             partMessage.setText()
-            channel.stream.add(partMessage)
-            channel.stream.add({type: 'error', raw: "You are no longer talking in "+channel.get("name")})
+            channel.stream.add partMessage
+            channel.stream.add {type: 'error', raw: "You are no longer talking in "+channel.get("name")}
             channel.participants.reset()
     else
         channel = frames.getByName(data.channel)
         channel.participants.getByNick(data.nick).destroy()
-        partMessage = new Message({type: 'part', nick: data.nick, raw: data.reason})
+        partMessage = new Message {type: 'part', nick: data.nick, raw: data.reason}
         partMessage.setText()
         channel.stream.add(partMessage)
-        if(channel.get("active") == channel)
+        if channel.get("active") == channel
             nickList.update(channel.participants)
 
 socket.on 'names', (data) ->
-    frame = frames.getByName(data.channel)
+    frame = frames.getByName data.channel
+    frame.participants.reset()
     for nick, mode of data.nicks
-        frame.participants.add({nick: nick, opStatus: mode})
+        frame.participants.add {nick: nick, opStatus: mode}
