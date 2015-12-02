@@ -54,17 +54,19 @@ server.on 'error', (err) ->
 
 sockets = io.listen(server)
 sockets.on 'connection', (client) ->
-    ircdata = {}
+    ircdata = null
     console.log 'client connected'
+    client.on 'initirc', (props) ->
+        console.log 'client initiated'
+        ircdata = props
+        console.log props
+        setTimeout () ->
+            client.emit 'ircconnect', props
+        , 1000
     client.on 'clientevent', (data) ->
+        if ircdata == null
+            return
         switch data.type
-            when "initirc"
-                console.log 'client initiated'
-                ircdata = data.props
-                console.log data.props
-                run = () ->
-                    client.emit 'ircconnect', data.props
-                setTimeout(run, 1000)
             when "rawinput"
                 if data.message == 'testjoin'
                     client.emit 'join', {channel:'#ponies', nick:ircdata.nick, server:ircdata.server}
@@ -78,6 +80,10 @@ sockets.on 'connection', (client) ->
                 if data.message == 'testjoin-more'
                     client.emit 'join', {channel:'#horsie', nick:ircdata.nick, server:ircdata.server}
                     client.emit 'names', {channel:'#horsie', nicks:{'icydiamond':'~', 'squeely':'%', 'pinkiepie':'~', 'applejack':'+','derpy':'+','randomz':''}}
+                if data.message == 'test1'
+                    client.emit 'join', {channel:"#ponies", nick:"thechosenone"}
+                if data.message == 'pmme'
+                    client.emit 'privmsg', {nick: "thechosenone", message:"This is a test message, hi!", target: ircdata.nick}
                 console.log 'client broadcast'
                 console.log data
                 client.emit 'echoback', data.message

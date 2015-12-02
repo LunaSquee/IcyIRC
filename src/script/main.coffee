@@ -258,9 +258,8 @@ class NickListView extends Backbone.View
 nickList = new NickListView
 
 class FrameView extends Backbone.View
-    el: $('#messageView')
-    # to track scroll position
-    position: {}
+    el: $('#messageView'),
+    position: {},
 
     initialize: ->
         # idk
@@ -329,6 +328,7 @@ class FrameTabView extends Backbone.View
         this.model.bind('destroy', this.close, this)
         this.isClosing = false
         this.render()
+        this.presInput = null
 
     events:
         'click .close-frame': 'close'
@@ -356,7 +356,7 @@ class FrameTabView extends Backbone.View
                         $(this.el).next().click()
 
         d = frames.getByName $(this.el).data('frame')
-        if d != null && d.get 'type' != "status"
+        if d != null && d.get('type') != "status"
             this.isClosing = true
             this.part()
             $(this.el).remove()
@@ -364,6 +364,9 @@ class FrameTabView extends Backbone.View
     setActive: ->
         if this.isClosing
             return
+        
+        irc.app.focusChanged this
+
         $(this.el).addClass('active').siblings().removeClass('active')
         irc.frameWindow.focus this.model
 
@@ -379,15 +382,16 @@ class FrameTabView extends Backbone.View
         return this.model.get('type') == 'status'
 
 class AppView extends Backbone.View
-    el: $('#chatView')
-    frameList: $('#tabsArea #tabList')
+    el: $('#chatView'),
+    frameList: $('#tabsArea #tabList'),
+    activeTab: null
 
     initialize: ->
         frames.bind('add', this.addTab, this)
         this.input = this.$('#ircMessage')
 
     events:
-        'keypress #ircMessage': 'sendInput'
+        'keydown #ircMessage': 'sendInput'
         'click #ircNicknameChange': 'changeNick'
 
     updateNick: (nick) ->
@@ -397,21 +401,26 @@ class AppView extends Backbone.View
     addTab: (frame) ->
         tab = new FrameTabView {model: frame}
         this.frameList.append(tab.el)
-        tab.setActive()
+        if frame.get('type') == 'channel' || frame.get('type') == 'status'
+            tab.setActive()
+
+    focusChanged: (tab) ->
+        if this.activeTab
+            this.activeTab.presInput = this.input.val()
+        this.input.val ''
+        this.activeTab = tab
+        if tab.presInput
+            this.input.val tab.presInput
 
     sendInput: (e) ->
+        frame = irc.frameWindow.focused
         if e.keyCode != 13
             return
-        frame = irc.frameWindow.focused
         input = this.input.val()
-
         if input == null || input == ""
             return
-
-        # socket.emit 'rawinput', input
         clientToServerSend {type: 'rawinput', message: input, target: frame.get("name")}
-
-        this.input.val('')
+        this.input.val ''
 
     changeNick: (e) ->
         e && e.preventDefault()
@@ -523,8 +532,7 @@ class ConnectView extends Backbone.View
             $('#feedback').text "Nickname is required."
             return
 
-        #socket.emit 'initirc', connectInfo
-        clientToServerSend {type: 'initirc', props: connectInfo}
+        socket.emit 'initirc', connectInfo
 
         irc.me = new Person {nick: connectInfo.nick}
         
@@ -555,19 +563,24 @@ socket.on 'echoback', (message) ->
     frames.getActive().stream.add({sender: irc.me.get('nick'), raw: message})
 
 socket.on 'join', (data) ->
+    channel = frames.getByName(data.channel)
+
     if data.nick == irc.me.get('nick')
-        if !frames.getByName(data.channel)
-            frames.add({name: data.channel, type:"channel"})
-        channel = frames.getByName(data.channel)
-        joinMessage = new Message({type: 'join', nick: data.nick, sender:'-->', channel: data.channel})
-        joinMessage.setText()
-        channel.stream.add(joinMessage)
+        if !channel
+            channel = frames.add {name: data.channel, type:"channel"}
     else
-        channel = frames.getByName(data.channel)
-        channel.participants.add({nick: data.nick})
-        joinMessage = new Message({type: 'join', nick: data.nick, sender:'-->', channel: data.channel})
-        joinMessage.setText()
-        channel.stream.add(joinMessage)
+        channel.participants.add {nick: data.nick}
+
+    joinMessage = new Message {type: 'join', nick: data.nick, sender:'-->', channel: data.channel}
+    joinMessage.setText()
+    channel.stream.add joinMessage
+
+socket.on 'privmsg', (data) ->
+    target = frames.getByName(data.nick)
+    if !target
+        target = frames.add {name: data.nick, type:"private"}
+
+    target.stream.add {sender:data.nick, raw: data.message}
 
 socket.on 'nick', (data) ->
     if data.oldNick == irc.me.get 'nick'
@@ -591,22 +604,19 @@ socket.on 'nick', (data) ->
                 channel.stream.add nickMessage
 
 socket.on 'part', (data) ->
+    channel = frames.getByName(data.channel)
     if data.nick == irc.me.get('nick')
-        channel = frames.getByName(data.channel)
         if channel
-            partMessage = new Message {type: 'part', nick: data.nick, raw: data.reason, sender: '<--', channel: data.channel}
-            partMessage.setText()
-            channel.stream.add partMessage
             channel.stream.add {type: 'error', raw: "You are no longer talking in "+channel.get("name")}
             channel.participants.reset()
     else
-        channel = frames.getByName(data.channel)
         channel.participants.getByNick(data.nick).destroy()
+        if channel.get("active") == channel
+            nickList.update channel.participants
+    if channel
         partMessage = new Message {type: 'part', nick: data.nick, raw: data.reason, sender: '<--', channel: data.channel}
         partMessage.setText()
-        channel.stream.add(partMessage)
-        if channel.get("active") == channel
-            nickList.update(channel.participants)
+        channel.stream.add partMessage
 
 socket.on 'quit', (data) ->
     frames.each (ch) ->
