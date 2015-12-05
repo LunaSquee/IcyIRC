@@ -29,7 +29,7 @@ module.exports.parse = (rawInput) ->
 
     trailing = if prefixless.indexOf(' :') != -1 then prefixless.substring(prefixless.indexOf(' :')+2) else null
 
-    return {user: hostmask, command: command, arguments: args, trailing: trailing, raw: starter}
+    return {prefix: hostmask, command: command, arguments: args, trailing: trailing, raw: ":"+starter}
 
 # Strip IRC color codes from string
 module.exports.stripColors = (str) ->

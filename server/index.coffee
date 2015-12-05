@@ -6,6 +6,8 @@ commander = require 'commander'
 
 paxjson = require __dirname + '/../package.json'
 config = require __dirname + '/../script/config'
+parser = require __dirname + '/parser'
+connection = require __dirname + '/irc/server'
 
 io = require 'socket.io'
 # irc = require './irc'
@@ -51,9 +53,21 @@ server.on 'error', (err) ->
     process.exit 1
 
 # initialize
+#
+#newConn = new connection.Connection({host: config.irc.default_serv, port: 6667, username: "icy", nickname: "hiponies", realname: "IcyDiamond", timeout: 0})
+#newConn.on 'raw', (d) ->
+#    console.log parser.parse d
+#
+#newConn.on 'closed', (d) ->
+#    console.log d
+#
+#newConn.on 'connection', (d) ->
+#    console.log 'connecting'
 
 sockets = io.listen(server)
 sockets.on 'connection', (client) ->
+    address = client.handshake.address
+    console.log 'New connection from ' + address
     ircdata = null
     console.log 'client connected'
     client.on 'initirc', (props) ->
