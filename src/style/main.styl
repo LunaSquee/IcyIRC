@@ -281,7 +281,7 @@ input,textarea
                 background: linear-gradient(to right, rgba(0,0,0,0) 0%,rgba(13,52,0,0) 25%,rgba(49,199,0,1) 95%,rgba(52,209,0,1) 100%)
                 border-top-right-radius: 10px
                 border-bottom-right-radius: 10px
-            .topic
+            .topic,.topic_now,.topic_set_by
                 color: #09F
                 font-weight: bold
             .timestamp 
@@ -312,7 +312,7 @@ input,textarea
             top: 0
             right: 0
             bottom: 0
-            width: 250px
+            width: 200px
             border-left: 1px solid #dadada
             padding: 10px
             display: none
@@ -325,21 +325,21 @@ input,textarea
                 text-align: center
                 background-color: #E0E0E0
                 border-radius: 10px
-                margin: 1px
+                //margin: 1px
                 line-height: 19px
                 color: #0BAB00
                 cursor: help
                 margin-right: 5px
-                font-size: 21px
+                font-size: 15px
                 &.op_owner
                     color: #C50000 !important
                 &.op_voice
                     color: #0089FF !important
                 &.op_half-op
-                    font-size: 20px !important
+                    font-size: 15px !important
                     color: #B119A5 !important
             .nickname
-                font-size: 18px
+                font-size: 14px
                 cursor: pointer
                 width: 250px
                 display: inline-block
@@ -354,9 +354,9 @@ input,textarea
                     color: #7D7D7D
         &.displaynicklist
             #topicView
-                right: 270px
+                right: 220px
             #messageView
-                right: 270px
+                right: 220px
             #userList
                 display: block
         &.displaytopic
@@ -393,3 +393,69 @@ input,textarea
             padding: 5px
             color: #fff
             cursor: pointer
+
+.message
+    .bg00,.bg0 
+        background-color: white
+    .bg01,.bg1 
+        background-color: black
+    .bg02,.bg2 
+        background-color: navy
+    .bg03,.bg3 
+        background-color: green
+    .bg04,.bg4 
+        background-color: red
+    .bg05,.bg5 
+        background-color: brown
+    .bg06,.bg6 
+        background-color: purple
+    .bg07,.bg7 
+        background-color: orange
+    .bg08,.bg8 
+        background-color: yellow
+    .bg09,.bg9 
+        background-color: lime
+    .bg10 
+        background-color: teal
+    .bg11 
+        background-color: cyan
+    .bg12 
+        background-color: blue
+    .bg13 
+        background-color: pink
+    .bg14 
+        background-color: grey
+    .bg15 
+        background-color: lightgrey
+    .fg00,.fg0 
+        color: white
+    .fg01,.fg1 
+        color: black
+    .fg02,.fg2 
+        color: navy
+    .fg03,.fg3 
+        color: green
+    .fg04,.fg4 
+        color: red
+    .fg05,.fg5 
+        color: brown
+    .fg06,.fg6 
+        color: purple
+    .fg07,.fg7 
+        color: orange
+    .fg08,.fg8 
+        color: yellow
+    .fg09,.fg9 
+        color: lime
+    .fg10 
+        color: teal
+    .fg11 
+        color: cyan
+    .fg12 
+        color: blue
+    .fg13 
+        color: pink
+    .fg14 
+        color: grey
+    .fg15 
+        color: lightgrey

@@ -48,6 +48,10 @@ class Client {
 						break
 				}
 				self.wsocket.emit('ircconnect', { host: config.host, error: msg })
+			} else if(t.type === 'end') {
+				self.wsocket.emit('ircdisconnect', { host: config.host })
+				if(self.connections[config.host])
+					delete self.connections[config.host]
 			}
 		})
 
@@ -72,6 +76,8 @@ class Client {
 				self.wsocket.emit('notice', { message: parsed.trailing, nick: sender, target: target, server: config.host })
 				break
 			case 'PRIVMSG':
+				if(parsed.trailing.indexOf('\u0001') === 0 && parsed.trailing.indexOf('\u0001ACTION') !== 0)
+					return self.handleCTCP(parsed, connection, config)
 				self.wsocket.emit('privmsg', { message: parsed.trailing, nick: parsed.prefix.nickname, target: parsed.arguments[0], server: config.host })
 				break
 			case '375':
@@ -145,15 +151,51 @@ class Client {
 			case '366':
 				if(parsed.arguments[1] in connection.tempParams.namesRequests)
 					delete connection.tempParams.namesRequests[parsed.arguments[1]]
+			case 'TOPIC':
+				self.wsocket.emit('topic', { triggerType: 0, nick: parsed.prefix.nickname, topic: parsed.trailing, channel: parsed.arguments[0], server: config.host })
+				break
+			case '332':
+				self.wsocket.emit('topic', { triggerType: 1, topic: parsed.trailing, channel: parsed.arguments[1], server: config.host })
+				break
+			case '333':
+				self.wsocket.emit('topic', { triggerType: 2, hostmask: parsed.arguments[2], channel: parsed.arguments[1], timestamp: parsed.arguments[3], server: config.host })
+				break
 		}
 	}
 
 	destroy() {
 		for(let t in this.connections) {
-			this.connections[t].connection.write('QUIT '+config.irc.default_quit_msg+'\r\n')
+			this.connections[t].connection.write('QUIT :'+config.irc.default_quit_msg+'\r\n')
 			delete this.connections[t]
-			//this.connections[t].connection.end()
 		}
+	}
+
+	handleCTCP(parsed, connection, conf) {
+		let ctCmd = parsed.trailing.trim().split(' ')
+
+		for(let i in ctCmd)
+			ctCmd[i] = ctCmd[i].replace(/\u0001/g, '')
+		
+		let ctcp = ctCmd[0]
+		let result = ''
+
+		switch(ctcp) {
+			case 'VERSION':
+				result = config.general.name + ' version '+config.general.version
+				break
+			case 'SOURCE':
+				result = 'https://github.com/LunaSquee/IcyIRC'
+				break
+			case 'PING':
+				result = ctCmd.slice(1).join(' ')
+				break
+			case 'CLIENTINFO':
+				result = 'VERSION SOURCE PING CLIENTINFO'
+				break
+			default:
+				result = 0
+		}
+		connection.connection.write('NOTICE '+parsed.prefix.nickname+' :\x01'+ctcp+' '+result+'\x01\r\n')
 	}
 
 	handleInput(data) {
@@ -177,7 +219,9 @@ class Client {
 				t.connection.write('NICK '+data.newNick+'\r\n')
 				break
 			case 'quit':
-				t.connection.write('QUIT :'+data.reason || config.irc.default_quit_msg+'\r\n')
+				let reason = data.reason != null ? data.reason : config.irc.default_quit_msg
+				t.connection.write('QUIT :'+reason+'\r\n')
+				delete this.connections[data.server]
 				break
 		}
 	}

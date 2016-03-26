@@ -1,7 +1,8 @@
 # Main IcyIRC config
 
 [general]
-	name = 'IcyIRC'
+	name             = 'IcyIRC'
+	version          = '0.1'
 
 [irc]
 	default_quit_msg = 'IcyIRC WebIRC Client version 0.1'

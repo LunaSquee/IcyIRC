@@ -49,6 +49,51 @@ if !String.prototype.linkify
             return '<a href="' + href + '" target="_blank">' + url + '</a>'
         return parsed
 
+if !String.prototype.colorize
+    String.prototype.colorize = () ->
+        text = this || ""
+        #control codes
+        rex = /\x03([0-9]{1,2})(?:[,]{1}([0-9]{1,2}){1})?([^\x03]+)/
+        matches = undefined
+        colors = undefined
+        if rex.test(text)
+            while cp = rex.exec(text)
+                if cp[2]
+                    cbg = cp[2]
+                text = text.replace(cp[0], '<span class="fg' + cp[1] + ' bg' + cbg + '">' + cp[3] + '</span>')
+        #bold,italics,underline (more could be added.)
+        bui = [
+            [ /\x02([^\x02]+)(\x02)?/
+                [
+                    '<b>'
+                    '</b>'
+                ]
+            ]
+            [
+                /\x1F([^\x1F]+)(\x1F)?/
+                    [
+                        '<u>'
+                        '</u>'
+                    ]
+            ]
+            [
+                /\x1D([^\x1D]+)(\x1D)?/
+                [
+                    '<i>'
+                    '</i>'
+                ]
+            ]
+        ]
+        i = 0
+        while i < bui.length
+            bc = bui[i][0]
+            style = bui[i][1]
+            if bc.test(text)
+                while bmatch = bc.exec(text)
+                    text = text.replace(bmatch[0], style[0] + bmatch[1] + style[1])
+            i++
+        text
+
 class Message extends Backbone.Model
         defaults:
             # expected properties:
@@ -87,10 +132,12 @@ class Message extends Backbone.Model
                     text = this.get("nick")+' sets mode '+this.get('text')
                 when 'topic'
                     text = this.get("nick")+' set the topic of '+this.get('text')
+                when 'topic_now'
+                    text = 'The topic '+this.get('text')
                 when 'raw'
                     text = this.get("nick")+': '+this.get('text')
-                when 'motd'
-                    text = this.get('text')
+                when 'error'
+                    text = this.get('raw')
                 when 'kick'
                     pref = if this.get("kickee") != irc.me.get("nick") then this.get("kickee")+' has been' else 'You have been'
                     text = pref+' kicked by '+this.get("nick")+' (Reason: '+this.get('text')+')'
@@ -165,7 +212,8 @@ class MessageView extends Backbone.View
             text: this.model.get('text')
 
         $(@el).addClass(@model.get('type')+' message').html this.tmpl(context).linkify()
-        
+        $(@el).find('.text').html $(@el).find('.text').html().toString().colorize()
+
         if context.sender && context.sender.toLowerCase() != irc.me.get("nick").toLowerCase()
             if context.text && context.text.indexOf(irc.me.get("nick")) != -1
                 $(this.el).addClass("mentioned")
@@ -606,7 +654,6 @@ errorToFrame = (frame, message) ->
     frame.stream.add new Message {type: 'error', text: message, sender:'***'}
 
 socket.on 'ircconnect', (stuff) ->
-    console.log(stuff)
     if stuff.error
         frames.getByName(stuff.host).stream.add {sender: '*', raw: stuff.error, type: 'error'}
         $('#feedback').text stuff.error
@@ -615,6 +662,13 @@ socket.on 'ircconnect', (stuff) ->
 
     irc.app.render()
     frames.getByName(stuff.host).stream.add {sender: '*', raw: "Connected to server"}
+
+socket.on 'ircdisconnect', (stuff) ->
+    frames.each (ch) ->
+        if ch.get('server') == stuff.host
+            mess = new Message {type: 'error', raw: "Connection to server closed"}
+            mess.setText()
+            ch.stream.add mess
 
 socket.on 'echoback', (message) ->
     frames.getActive().stream.add({sender: irc.me.get('nick'), raw: message})
@@ -656,11 +710,13 @@ socket.on 'notice', (data) ->
     else
         target = frames.getByName(data.target)
 
-    target.stream.add {sender:data.nick, raw: data.message, type: 'notice'}
+    notice = new Message {sender:data.nick, raw: data.message, type: 'notice'}
+    notice.setText()
+    target.stream.add notice
 
 socket.on 'motd', (data) ->
     target = frames.getByName(data.server)
-    target.stream.add {sender:'', raw: data.message, type: 'motd'}
+    target.stream.add {sender:'', text: data.message, type: 'motd'}
 
 socket.on 'nick', (data) ->
     if data.oldNick == irc.me.get 'nick'
@@ -687,7 +743,7 @@ socket.on 'part', (data) ->
     channel = frames.getByName(data.channel)
     if data.nick == irc.me.get('nick')
         if channel
-            channel.stream.add {type: 'error', raw: "You are no longer talking in "+channel.get("name")}
+            channel.stream.add new Message {type: 'error', raw: "You are no longer talking in "+channel.get("name")}
             channel.participants.reset()
     else
         channel.participants.getByNick(data.nick).destroy()
@@ -702,10 +758,10 @@ socket.on 'kick', (data) ->
     channel = frames.getByName(data.channel)
     if data.kickee == irc.me.get('nick')
         if channel
-            channel.stream.add {type: 'error', raw: "You are no longer talking in "+channel.get("name")}
+            channel.stream.add new Message {type: 'error', raw: "You are no longer talking in "+channel.get("name")}
             channel.participants.reset()
     else
-        channel.participants.getByNick(data.nick).destroy()
+        channel.participants.getByNick(data.kickee).destroy()
         if channel.get("active") == channel
             nickList.update channel.participants
     if channel
@@ -736,10 +792,20 @@ socket.on 'names', (data) ->
 socket.on 'topic', (data) ->
     channel = frames.getByName data.channel
     if channel
-        channel.set {topic: data.topic}
-        topicmsg = new Message {type: 'topic', nick: data.nick, raw: data.channel+" to "+data.topic}
-        topicmsg.setText()
-        channel.stream.add topicmsg
+        if data['triggerType'] == 0
+            channel.set {topic: data.topic}
+            topicmsg = new Message {type: 'topic', nick: data.nick, raw: data.channel+" to \""+data.topic+"\""}
+            topicmsg.setText()
+            channel.stream.add topicmsg
+        else if data['triggerType'] == 1
+            channel.set {topic: data.topic}
+            topicmsg = new Message {type: 'topic_now', raw: "of "+data.channel+" is \""+data.topic+"\""}
+            topicmsg.setText()
+            channel.stream.add topicmsg
+        else if data['triggerType'] == 2
+            topicmsg = new Message {type: 'topic_set_by', text: data.hostmask+" set the topic on "+new Date(parseInt(data.timestamp)*1000)}
+            topicmsg.setText()
+            channel.stream.add topicmsg
 
 socket.on 'disconnect', (data) ->
     alert('Connection to IcyIRC server was lost!')
