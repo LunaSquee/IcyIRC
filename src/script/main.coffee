@@ -71,16 +71,29 @@ class Message extends Backbone.Model
         setText: ->
             text = ''
             switch (this.get('type'))
-                when 'join' then text = this.get('nick') + ' has joined '+this.get('channel')
-                when 'part' then text = this.get('nick') + ' has left '+this.get('channel')+' ('+this.get("text")+')'
-                when 'quit' then text = this.get('nick') + ' has quit ('+this.get("text")+')'
-                when 'action' then text = '* '+ this.get('nick') + ' '+this.get("text")
-                when 'nick' then text = this.get('oldNick') + ' is now known as ' + this.get('newNick')
-                when 'notice' then text = "["+this.get("nick")+"] " + this.get('text')
-                when 'mode' then text = this.get("nick")+' sets mode '+this.get('text')
-                when 'topic' then text = this.get("nick")+' set the topic of '+this.get('text')
-                when 'raw' then text = this.get("nick")+': '+this.get('text')
-                when 'kick' then text = (this.get("kickee")!=irc.me.get("nick")?this.get("kickee")+' has been':'You have been')+ ' kicked by '+this.get("nick")+' (Reason: '+this.get('text')+')'
+                when 'join'
+                    text = this.get('nick') + ' has joined '+this.get('channel')
+                when 'part'
+                    text = this.get('nick') + ' has left '+this.get('channel')+' ('+this.get("text")+')'
+                when 'quit'
+                    text = this.get('nick') + ' has quit ('+this.get("text")+')'
+                when 'action'
+                    text = '* '+ this.get('nick') + ' '+this.get("text")
+                when 'nick'
+                    text = this.get('oldNick') + ' is now known as ' + this.get('newNick')
+                when 'notice'
+                    text = "["+this.get("nick")+"] " + this.get('text')
+                when 'mode'
+                    text = this.get("nick")+' sets mode '+this.get('text')
+                when 'topic'
+                    text = this.get("nick")+' set the topic of '+this.get('text')
+                when 'raw'
+                    text = this.get("nick")+': '+this.get('text')
+                when 'motd'
+                    text = this.get('text')
+                when 'kick'
+                    pref = if this.get("kickee") != irc.me.get("nick") then this.get("kickee")+' has been' else 'You have been'
+                    text = pref+' kicked by '+this.get("nick")+' (Reason: '+this.get('text')+')'
             this.set({text: text})
 
 class Stream extends Backbone.Collection
@@ -151,7 +164,7 @@ class MessageView extends Backbone.View
             sender: this.model.get('sender')
             text: this.model.get('text')
 
-        $(@el).addClass(@model.get('type')).html this.tmpl(context).linkify()
+        $(@el).addClass(@model.get('type')+' message').html this.tmpl(context).linkify()
         
         if context.sender && context.sender.toLowerCase() != irc.me.get("nick").toLowerCase()
             if context.text && context.text.indexOf(irc.me.get("nick")) != -1
@@ -339,7 +352,7 @@ class FrameTabView extends Backbone.View
         mframe = frames.getByName(this.model.get('name'))
         if mframe
             if mframe.get("type") == "channel"
-                clientToServerSend {type: "part", channel: mframe.get("name")}
+                clientToServerSend {type: "part", channel: mframe.get("name"), server: mframe.get("server"), reason: "Tab closed"}
             frames.remove(mframe)
             mframe.destroy()
             this.model.destroy()
@@ -417,9 +430,49 @@ class AppView extends Backbone.View
         if e.keyCode != 13
             return
         input = this.input.val()
-        if input == null || input == ""
+        if input == null || input.trim() == ""
             return
-        clientToServerSend {type: 'rawinput', message: input, target: frame.get("name")}
+
+        if input.indexOf('/') == 0
+            crdarg = input.trim().split(' ')
+            cmd = crdarg[0].substring(1)
+            switch cmd
+                when "join"
+                    if crdarg[1] == undefined
+                        return errorToFrame(frame, 'Please specify channel.')
+                    if crdarg[1].indexOf('#') == -1
+                        return errorToFrame(frame, 'Invalid channel name.')
+                    clientToServerSend {type: 'join', channel: crdarg[1], server: frame.get("server")}
+                when "me"
+                    if crdarg[1] == undefined
+                        return errorToFrame(frame, 'Can\'t send blank message to server')
+                    clientToServerSend {type: 'rawinput', message: crdarg.slice(1).join(' '), target: frame.get("name"), server: frame.get("server"), appendAction: 1}
+                when "part"
+                    if crdarg[1] == undefined && frame.get("type") != "channel"
+                        return errorToFrame(frame, 'Please specify channel.')
+                    if crdarg[1]
+                        if crdarg[1].indexOf('#') != -1
+                            return errorToFrame(frame, 'Invalid channel.')
+                        message = "Leaving..."
+                        if crdarg[2]
+                            message = crdarg.slice(2).join(' ')
+                        clientToServerSend {type: 'part', channel: crdarg[1], server: frame.get("server"), reason: message}
+                    else
+                        clientToServerSend {type: 'part', channel: frame.get("name"), server: frame.get("server"), reason: "Leaving..."}
+                when "quit"
+                    message = null
+                    if crdarg[1]
+                        message = crdarg.slice(1).join(' ')
+                    clientToServerSend {type: 'quit', server: frame.get("server"), reason: message}
+                when "nick"
+                    if crdarg[1] == undefined
+                        clientToServerSend {type: 'nick', newNick: crdarg[1], server: frame.get("server")}
+                when "msg"
+                    if crdarg[1] == undefined || crdarg[2] == undefined
+                        return errorToFrame(frame, 'Usage: /msg <target> <message>')
+                    clientToServerSend {type: 'rawinput', message: crdarg.slice(2).join(' '), target: crdarg[1], server: frame.get("server")}
+        else
+            clientToServerSend {type: 'rawinput', message: input, target: frame.get("name"), server: frame.get("server")}
         this.input.val ''
 
     changeNick: (e) ->
@@ -427,7 +480,7 @@ class AppView extends Backbone.View
         nickn = $('#ircNN').val()
         if nickn == null
             return
-        clientToServerSend {type: 'nick', newNick: nickn}
+        clientToServerSend {type: 'nick', newNick: nickn, server: irc.frameWindow.focused.get("server")}
         $('#nicknamebox').addClass 'invisible'
 
     render: ->
@@ -549,15 +602,19 @@ connect = new ConnectView
 clientToServerSend = (main) ->
     socket.emit 'clientevent', main
 
+errorToFrame = (frame, message) ->
+    frame.stream.add new Message {type: 'error', text: message, sender:'***'}
+
 socket.on 'ircconnect', (stuff) ->
+    console.log(stuff)
     if stuff.error
-        frames.getByName(stuff.server).stream.add {sender: '*', raw: stuff.error, type: 'error'}
-        $('#feedback').text "Connection failed"
+        frames.getByName(stuff.host).stream.add {sender: '*', raw: stuff.error, type: 'error'}
+        $('#feedback').text stuff.error
         irc.alreadyConnected = false
         return
 
     irc.app.render()
-    frames.getByName(stuff.server).stream.add {sender: '*', raw: "Connected to server"}
+    frames.getByName(stuff.host).stream.add {sender: '*', raw: "Connected to server"}
 
 socket.on 'echoback', (message) ->
     frames.getActive().stream.add({sender: irc.me.get('nick'), raw: message})
@@ -567,7 +624,7 @@ socket.on 'join', (data) ->
 
     if data.nick == irc.me.get('nick')
         if !channel
-            channel = frames.add {name: data.channel, type:"channel"}
+            channel = frames.add {name: data.channel, type:"channel", server:data.server}
     else
         channel.participants.add {nick: data.nick}
 
@@ -576,11 +633,34 @@ socket.on 'join', (data) ->
     channel.stream.add joinMessage
 
 socket.on 'privmsg', (data) ->
-    target = frames.getByName(data.nick)
-    if !target
-        target = frames.add {name: data.nick, type:"private"}
+    if data.target == irc.me.get('nick')
+        target = frames.getByName(data.nick)
+        if !target
+            target = frames.add {name: data.nick, type:"private", server: data.server}
+    else
+        target = frames.getByName(data.target)
 
-    target.stream.add {sender:data.nick, raw: data.message}
+    if data.message.indexOf('\u0001ACTION') == 0
+        data.message = data.message.substring(8)
+        nmesg = new Message {type: 'action', nick:data.nick, raw: data.message}
+        nmesg.setText()
+        target.stream.add nmesg
+    else
+        target.stream.add new Message {sender:data.nick, raw: data.message}
+
+socket.on 'notice', (data) ->
+    if data.target == irc.me.get('nick')
+        target = frames.getByName(data.nick)
+        if !target
+            target = frames.add {name: data.nick, type:"private", server: data.server}
+    else
+        target = frames.getByName(data.target)
+
+    target.stream.add {sender:data.nick, raw: data.message, type: 'notice'}
+
+socket.on 'motd', (data) ->
+    target = frames.getByName(data.server)
+    target.stream.add {sender:'', raw: data.message, type: 'motd'}
 
 socket.on 'nick', (data) ->
     if data.oldNick == irc.me.get 'nick'
@@ -618,6 +698,21 @@ socket.on 'part', (data) ->
         partMessage.setText()
         channel.stream.add partMessage
 
+socket.on 'kick', (data) ->
+    channel = frames.getByName(data.channel)
+    if data.kickee == irc.me.get('nick')
+        if channel
+            channel.stream.add {type: 'error', raw: "You are no longer talking in "+channel.get("name")}
+            channel.participants.reset()
+    else
+        channel.participants.getByNick(data.nick).destroy()
+        if channel.get("active") == channel
+            nickList.update channel.participants
+    if channel
+        partMessage = new Message {type: 'kick', nick: data.kicker, raw: data.reason, kickee: data.kickee, channel: data.channel}
+        partMessage.setText()
+        channel.stream.add partMessage
+
 socket.on 'quit', (data) ->
     frames.each (ch) ->
         if ch.get 'type' != 'channel'
@@ -633,7 +728,8 @@ socket.on 'quit', (data) ->
 
 socket.on 'names', (data) ->
     frame = frames.getByName data.channel
-    frame.participants.reset()
+    if data['part'] == null
+        frame.participants.reset()
     for nick, mode of data.nicks
         frame.participants.add {nick: nick, opStatus: mode}
 
@@ -644,3 +740,7 @@ socket.on 'topic', (data) ->
         topicmsg = new Message {type: 'topic', nick: data.nick, raw: data.channel+" to "+data.topic}
         topicmsg.setText()
         channel.stream.add topicmsg
+
+socket.on 'disconnect', (data) ->
+    alert('Connection to IcyIRC server was lost!')
+    window.location.reload()

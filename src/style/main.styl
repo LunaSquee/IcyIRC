@@ -253,6 +253,9 @@ input,textarea
             left: 0
             right: 0
             padding: 5px
+            overflow-y: auto
+            .message
+                clear: both
             .error
                 background-color: rgba(255, 0, 0, 0.41)
             .sender
@@ -264,6 +267,7 @@ input,textarea
                 z-index: 10
                 overflow: hidden
                 word-wrap: normal
+                white-space: pre
             .text 
                 display: block
                 margin-left: 115px
@@ -296,6 +300,13 @@ input,textarea
                     color: red !important
                 color: red
                 font-weight: bold
+            .notice
+                color: #B58900
+                font-weight: bolder
+            .motd
+                font-family: monospace
+                font-size: 15px
+                white-space: pre
         #userList
             position: absolute
             top: 0
@@ -305,6 +316,8 @@ input,textarea
             border-left: 1px solid #dadada
             padding: 10px
             display: none
+            overflow-y: auto
+            overflow-x: hidden
             .opstat
                 width: 20px
                 height: 20px
@@ -335,6 +348,7 @@ input,textarea
                 .nickcontt
                     max-width: 20px
                     display: inline-block
+                    white-space: pre
                 &:hover
                     margin-left: 2px
                     color: #7D7D7D
