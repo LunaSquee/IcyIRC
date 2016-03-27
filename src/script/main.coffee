@@ -123,11 +123,11 @@ class Message extends Backbone.Model
                 when 'quit'
                     text = this.get('nick') + ' has quit ('+this.get("text")+')'
                 when 'action'
-                    text = '* '+ this.get('nick') + ' '+this.get("text")
+                    text = this.get('nick') + ' '+this.get("text")
                 when 'nick'
                     text = this.get('oldNick') + ' is now known as ' + this.get('newNick')
                 when 'notice'
-                    text = "["+this.get("nick")+"] " + this.get('text')
+                    text = "[NOTICE] " + this.get('text')
                 when 'mode'
                     text = this.get("nick")+' sets mode '+this.get('text')
                 when 'topic'
@@ -696,7 +696,7 @@ socket.on 'privmsg', (data) ->
 
     if data.message.indexOf('\u0001ACTION') == 0
         data.message = data.message.substring(8)
-        nmesg = new Message {type: 'action', nick:data.nick, raw: data.message}
+        nmesg = new Message {type: 'action', nick:data.nick, raw: data.message, sender: '*'}
         nmesg.setText()
         target.stream.add nmesg
     else
@@ -804,7 +804,6 @@ socket.on 'topic', (data) ->
             channel.stream.add topicmsg
         else if data['triggerType'] == 2
             topicmsg = new Message {type: 'topic_set_by', text: data.hostmask+" set the topic on "+new Date(parseInt(data.timestamp)*1000)}
-            topicmsg.setText()
             channel.stream.add topicmsg
 
 socket.on 'disconnect', (data) ->

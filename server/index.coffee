@@ -21,6 +21,8 @@ if args.dev
     process.env.NODE_ENV = 'development'
     console.log 'running in development mode'
 
+process.title = config.general.name
+
 express = require 'express'
 morgan = require 'morgan'
 favicon = require 'serve-favicon'
@@ -51,6 +53,10 @@ server = app.listen config.server.port, "0.0.0.0", ->
 server.on 'error', (err) ->
     console.error 'Server: '+err, config.server.port
     process.exit 1
+
+process.on 'uncaughtException', (e) ->
+    console.error '[Uncaught exception] ' + e
+    console.error e.stack
 
 sockets = io.listen(server)
 clients = {}

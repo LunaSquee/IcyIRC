@@ -70,7 +70,7 @@ class Client {
 				let sender = parsed.prefix.nickname
 				let target = parsed.arguments[0]
 				if(sender == null) {
-					sender = ''
+					sender = parsed.arguments[0]
 					target = config.host
 				}
 				self.wsocket.emit('notice', { message: parsed.trailing, nick: sender, target: target, server: config.host })
@@ -105,6 +105,16 @@ class Client {
 			case 'KICK':
 				self.wsocket.emit('kick', { kicker: parsed.prefix.nickname, kickee: parsed.arguments[1], channel: parsed.arguments[0], reason: parsed.trailing || '' })
 				break
+			case 'MODE':
+				/*
+					User mode on channel:
+					  arguments: [ '#parasprite', '+o', 'BestPony' ],
+					  trailing: null,
+					Channel modes:
+					  arguments: [ '#parasprite', '+nt' ],
+					  trailing: null,
+				*/
+				break
 			case '004':
 				connection.serverData.serverName = parsed.arguments[1]
 				connection.serverData.version = parsed.arguments[2]
@@ -118,6 +128,13 @@ class Client {
 					let t = argv[a]
 					if(t.indexOf('=') != -1) {
 						t = t.split('=')
+						if(t[0] === 'PREFIX') {
+							let d = t[1].match(/\((\w+)\)(.*)/)
+							let r = d[1].split('')
+							let aa = d[2].split('')
+							for(let b in r)
+								connection.serverData.prefixes[r[b]] = aa[b]
+						}
 						connection.serverData.supports[t[0]] = t[1]
 					} else {
 						connection.serverData.supports[t] = true
@@ -129,6 +146,7 @@ class Client {
 					for(let t in config.autojoin)
 						connection.connection.write('JOIN '+config.autojoin[t]+'\r\n')
 					connection.tempParams.a005 = 4
+					console.log(connection.serverData)
 				}
 				break
 			case '353':

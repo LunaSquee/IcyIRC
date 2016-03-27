@@ -256,6 +256,8 @@ input,textarea
             overflow-y: auto
             .message
                 clear: both
+            .mentioned
+                background-color: rgba(0, 199, 0, 0.14)
             .error
                 background-color: rgba(255, 0, 0, 0.41)
             .sender
@@ -271,16 +273,9 @@ input,textarea
             .text 
                 display: block
                 margin-left: 115px
-                margin-bottom: 4px
             .nick
                 color: #FF9800;
                 font-weight: bold;
-            .mentioned .sender
-                background: -moz-linear-gradient(left, rgba(0,0,0,0) 0%, rgba(13,52,0,0) 25%, rgba(49,199,0,1) 95%, rgba(52,209,0,1) 100%)
-                background: -webkit-linear-gradient(left, rgba(0,0,0,0) 0%,rgba(13,52,0,0) 25%,rgba(49,199,0,1) 95%,rgba(52,209,0,1) 100%)
-                background: linear-gradient(to right, rgba(0,0,0,0) 0%,rgba(13,52,0,0) 25%,rgba(49,199,0,1) 95%,rgba(52,209,0,1) 100%)
-                border-top-right-radius: 10px
-                border-bottom-right-radius: 10px
             .topic,.topic_now,.topic_set_by
                 color: #09F
                 font-weight: bold

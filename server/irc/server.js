@@ -46,7 +46,8 @@ class Connection {
 			userModes: [],
 			channelModes: [],
 			serverModes: [],
-			supports: {}
+			supports: {},
+			prefixes: {}
 		}
 		this.tempParams = {
 			whoisRequests: {},
